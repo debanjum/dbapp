@@ -27,8 +27,8 @@ class CmdInterface(cmd.Cmd):
         pno = {'author': 1, 'editor': 2, 'reviewer': 3}[ptype]
 
         # Create Insert Query
-        INSERT_QUERY = "INSERT INTO `Person` (`id`, `first_name`, `last_name`, `type`, `email`, `affiliation`, `mailing_address`) VALUES \
-        ({0}, \'{1}\', \'{2}\', {3}, \'{4}\', '', \'{5}\');".format(42, fname, lname, pno, email, address)
+        INSERT_QUERY = "INSERT INTO `Person` (`first_name`, `last_name`, `type`, `email`, `affiliation`, `mailing_address`) VALUES \
+        (\'{0}\', \'{1}\', {2}, \'{3}\', '', \'{4}\');".format(fname, lname, pno, email, address)
 
         # Execute and Render Query
         self.execute(INSERT_QUERY)
@@ -67,15 +67,16 @@ if __name__ == "__main__":
     try:
         # setup connection to db
         con = mysql.connector.connect(host=SERVER, user=USER, password=PASS, database=DB, use_unicode=False)
-        print("Connection established.")
+        print("Connection to Megadodo Publications DB established.")
 
         # initialize a cursor
         cursor = con.cursor()
 
         # enter commandline i/o loop
         prompt = CmdInterface()
+        prompt.prompt = '> '
         prompt.init(cursor)
-        prompt.cmdloop()
+        prompt.cmdloop('Starting Megadodo Publication Prompt')
 
         # cleanup
         con.close()
