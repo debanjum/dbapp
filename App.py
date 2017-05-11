@@ -34,12 +34,21 @@ class CmdInterface(cmd.Cmd):
         filename = args[-1]
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        print ("title: {}, affiliation: {}, ri_code: {}, additional_authors: {}, filename: {}, now: {}".format(title, affiliation, ri_code, additional_authors, filename, now))
+        print ("title: {}, affiliation: {}, ri_code: {}, additional_authors: {} \
+        filename: {}, now: {}".format(title, affiliation, ri_code, additional_authors, filename, now))
 
-        SUBMIT_QUERY = ("INSERT INTO `Manuscript` (`title`,`description`,`ri_code`,`status`,`issue_vol`,`issue_year`,"
-                        "`num_pages`, `start_page`, `date_changed`, `date_created`, `review_date`) VALUES "
-                        "(\'{}\', '', {}, \'{}\', NULL, NULL, NULL, NULL, \'{}\', \'{}\', NULL);").format(title, ri_code, 'submitted', now, now)
-        self.cursor.execute(SUBMIT_QUERY)
+        # create squery to insert manuscript into manuscript table
+        queries = [("INSERT INTO `Manuscript` (`title`,`description`,`ri_code`,`status`,`issue_vol`,`issue_year`,"
+                    "`num_pages`, `start_page`, `date_changed`, `date_created`, `review_date`) VALUES "
+                    "(\'{}\', '', {}, \'{}\', NULL, NULL, NULL, NULL, \'{}\', \'{}\', NULL);").format(title, ri_code, 'submitted', now, now)]
+
+        # create query to update current logged in users affiliation
+        queries += ["UPDATE `aalavi_db`.`Person` "
+                    "SET affiliation = '{}' WHERE id = {}".format(affiliation, self.curr_id)]
+
+        # execute queries
+        for query in queries:
+            self.cursor.execute(query)
         self.con.commit()
 
     def do_login(self, line):
