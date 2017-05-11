@@ -120,12 +120,14 @@ class CmdInterface(cmd.Cmd):
             self.cursor.execute(QUERY)
         except mysql.connector.Error as e:        # catch SQL errors
             print("SQL Error: {0}".format(e.msg))
-            return
+            return False
 
         if self.cursor.rowcount > 0:
             print("Operation Successful!");
+            return True
         else:
             print("No Rows Affected by Operation, such a record does not exist or is inaccessible");
+            return False
 
     def do_display(self, QUERY):
         """helper function to execute SQL statement and render results"""
@@ -135,12 +137,12 @@ class CmdInterface(cmd.Cmd):
 
             # print table header
             print("\n\nResults:")
-            print("".join(["{:<15}".format(col) for col in self.cursor.column_names]))
+            print("".join(["{:<15} ".format(col) for col in self.cursor.column_names]))
             print("--------------------------------------------")
 
             # iterate through results
             for row in self.cursor:
-                print("".join(["{:<15}".format(row[col]) for col in self.cursor.column_names]))
+                print("".join(["{:<15} ".format(row[col]) for col in self.cursor.column_names]))
 
         except mysql.connector.Error as e:        # catch SQL errors
             print("SQL Error: {0}".format(e.msg))
@@ -164,7 +166,7 @@ class CmdInterface(cmd.Cmd):
             elif (self.mode == "author"):
                 print('\n'.join(['Available Commands:', '- status', '- submit', '- retract', '- logout' ,'- exit\n']))
             elif (self.mode == "reviewer"):
-                print('\n'.join(['Available Commands:', '- status', '- accept', '- reject', '- logout' ,'- exit\n']))
+                print('\n'.join(['Available Commands:', '- retire' ,'- status', '- accept', '- reject', '- logout' ,'- exit\n']))
             else:
                 print('\n'.join(['Available Commands:', '- rejoin', '- login', '- exit\n']))
         else:
@@ -250,9 +252,8 @@ class CmdInterface(cmd.Cmd):
             UPDATE_QUERY = ("UPDATE `aalavi_db`.`Manuscript_Reviewer` SET `result`='{}', `clarity`='{}', `method`='{}', "
                 " `contribution`='{}', `appropriate`='{}' WHERE `reviewer_id`='{}' AND `manuscript_id`='{}' AND `result` = '-';").format('y', clarity, method, appropriate, contribution, self.curr_id, manuscript_id)
 
-            self.do_execute(UPDATE_QUERY)
-
-            self.conn.commit()
+            if (self.do_execute(UPDATE_QUERY)):
+                self.conn.commit()
 
         elif (self.mode == "editor"):
             print("Command not usable")
@@ -283,9 +284,8 @@ class CmdInterface(cmd.Cmd):
             UPDATE_QUERY = ("UPDATE `aalavi_db`.`Manuscript_Reviewer` SET `result`='{}', `clarity`='{}', `method`='{}', "
                 " `contribution`='{}', `appropriate`='{}' WHERE `reviewer_id`='{}' AND `manuscript_id`='{}' AND `result` = '-';").format('n', clarity, method, appropriate, contribution, self.curr_id, manuscript_id)
 
-            self.do_execute(UPDATE_QUERY)
-
-            self.con.commit()
+            if (self.do_execute(UPDATE_QUERY)):
+                self.conn.commit()
 
         elif (self.mode == "editor"):
             print("Command not usable")
@@ -293,6 +293,41 @@ class CmdInterface(cmd.Cmd):
         else:
            print("Command not usable")
            return 
+
+    def do_retract(self, line):
+        if (self.mode == "author"):
+            manuscript_id = shlex.split(line)[0];
+
+            try: 
+                manuscript_id = int(manuscript_id)
+
+                if (manuscript_id < 0):
+                    print("ID must be non-negative!")
+                    return
+
+            except ValueError:
+                print("Invalid Input, please retry")
+                return
+
+            CHECK_QUERY = "SELECT * FROM Manuscript_Author WHERE author_id = {} AND manuscript_id = {} AND rank = 1".format(self.curr_id, manuscript_id);
+
+            if (self.do_execute(CHECK_QUERY)):
+                query_list = list()
+                query_list.append("DELETE FROM Manuscript_Author WHERE manuscript_id = {};".format(manuscript_id))
+                query_list.append("DELETE FROM Manuscript_Reviewer WHERE manuscript_id = {};".format(manuscript_id))
+                query_list.append("DELETE FROM Manuscript WHERE id = {};".format(manuscript_id))
+
+                for query in query_list:
+                    if (self.do_execute(query) == False):
+                        return
+
+                self.con.commit()
+
+                print("Manuscript Retracted!")
+
+        else:
+           print("Command not usable")
+           return  
 
     def do_EOF(self, line):
         return True
@@ -314,7 +349,7 @@ if __name__ == "__main__":
         print("Connection to Megadodo Publications DB established.")
 
         # initialize a cursor
-        cursor = con.cursor(dictionary = True)
+        cursor = con.cursor(buffered = True, dictionary = True)
 
         # enter commandline i/o loop
         prompt = CmdInterface()
