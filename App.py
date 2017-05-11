@@ -28,6 +28,12 @@ class CmdInterface(cmd.Cmd):
         self.curr_id = -1
 
     def do_submit(self, line):
+        # verify mode
+        if self.mode != 'author':
+            print("Command not usable in this mode")
+            return
+
+        # extract arguments
         args = shlex.split(line)
         title, affiliation, ri_code = args[:3]
         additional_authors = args[3:-1]
@@ -43,16 +49,33 @@ class CmdInterface(cmd.Cmd):
                     "(\'{}\', '', {}, \'{}\', NULL, NULL, NULL, NULL, \'{}\', \'{}\', NULL);").format(title, ri_code, 'submitted', now, now)]
 
         # create query to update current logged in users affiliation
-        queries += ["UPDATE `aalavi_db`.`Person` "
+        queries += ["UPDATE `Person` "
                     "SET affiliation = '{}' WHERE id = {}".format(affiliation, self.curr_id)]
 
         # execute queries
-        for query in queries:
-            self.cursor.execute(query)
-        self.con.commit()
+        if self.do_execute(queries, multi=True):
+            self.con.commit()
+
+    def do_assign(self, line):
+        # verify mode
+        if self.mode != "editor":
+            print("Command not usable in this mode")
+            return
+
+        # extract arguments
+        man_id, rev_id = shlex.split(line)
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        queries = [("INSERT INTO `Manuscript_Reviewer` "
+                    "(`reviewer_id`, `manuscript_id`, `result`, `clarity`, `method`, `contribution`, `appropriate`) "
+                    "VALUES ({},{},'-',NULL,NULL,NULL,NULL);").format(rev_id, man_id)]
+        queries += [("UPDATE Manuscript SET review_date = \'{}\' WHERE id = {}").format(now, man_id)]
+
+        # execute queries
+        if self.do_execute(queries, multi=True):
+            self.con.commit()
 
     def do_login(self, line):
-        if (self.mode != "none"):
+        if self.mode != "none":
             print("Command not usable")
             return
 
@@ -83,11 +106,11 @@ class CmdInterface(cmd.Cmd):
 
             self.do_help("")
 
-        if (self.cursor.rowcount == -1):
+        if self.cursor.rowcount == -1:
             print("User ID Not Found")
 
     def do_register(self, line):
-        # parse arguments
+        # parse non-mode dependent arguments
         tokens = shlex.split(line)
         # Map person type string to number
         pno = {'author': AUTHOR, 'editor': EDITOR, 'reviewer': REVIEWER}[tokens[0]]
@@ -120,26 +143,28 @@ class CmdInterface(cmd.Cmd):
             ptype, fname, lname = tokens[:3]
             ri_codes = tokens[3:]
             if not (1 <= len(ri_codes) <= 3):
-                raise ValueError('Each reviewer must have at least 1 and no more than 3 ri_codes')
+                print('Each reviewer must have at least 1 and no more than 3 ri_codes')
+                return
             email, address = "", ""
 
         queries = insert_sqls(fname, lname, pno, email, address, ri_codes)
 
         # Execute Query
-        for query in queries:
-            self.do_execute(query)
-        self.con.commit()
+        if self.do_execute(queries, multi=True):
+            self.con.commit()
 
         # Render Updated Table
         self.do_display("SELECT * FROM Person;")
         self.do_display("SELECT * FROM Reviewer_Interest;")
 
-    def do_execute(self, QUERY):
+    def do_execute(self, query, multi=False):
         """helper function to execute SQL statement"""
         try:
             # execute input query
-            print("Executing QUERY: '{0}'".format(QUERY))
-            self.cursor.execute(QUERY)
+            queries = query if multi else [query]
+            for q in queries:
+                print("Executing Query: '{0}'".format(q))
+                self.cursor.execute(q)
         except mysql.connector.Error as e:        # catch SQL errors
             print("SQL Error: {0}".format(e.msg))
             return False
@@ -182,14 +207,14 @@ class CmdInterface(cmd.Cmd):
         print('\n'.join(['Login: login <user_id>']))
 
     def do_help(self, line):
-        if (len(shlex.split(line)) == 0):
-            if (self.mode == "none"):
+        if len(shlex.split(line)) == 0:
+            if self.mode == "none":
                 print('\n'.join(['Available Commands:', '- register', '- login', '- exit\n']))
-            elif (self.mode == "editor"):
+            elif self.mode == "editor":
                 print('\n'.join(['Available Commands:', '- status', '- assign', '- accept', '- reject', '- typeset', '- schedule', '- publish', '- logout' ,'- exit\n']))
-            elif (self.mode == "author"):
+            elif self.mode == "author":
                 print('\n'.join(['Available Commands:', '- status', '- submit', '- retract', '- logout' ,'- exit\n']))
-            elif (self.mode == "reviewer"):
+            elif self.mode == "reviewer":
                 print('\n'.join(['Available Commands:', '- retire' ,'- status', '- accept', '- reject', '- logout' ,'- exit\n']))
             else:
                 print('\n'.join(['Available Commands:', '- rejoin', '- login', '- exit\n']))
@@ -200,7 +225,7 @@ class CmdInterface(cmd.Cmd):
                 self.help_login()
 
     def do_status(self, line):
-        if (self.mode == "author"):
+        if self.mode == "author":
             STATUS_QUERY = ("SELECT Manuscript.id, Manuscript.title, Manuscript.status "
                             "FROM Manuscript, Person, Manuscript_Author "
                             "WHERE Manuscript.id = Manuscript_Author.manuscript_id "
@@ -218,7 +243,7 @@ class CmdInterface(cmd.Cmd):
             # for row in self.cursor:
             #     print("{}\t{}\t{}".format(row["id"], ("{}...").format(row["title"][:20]), row["status"]))
 
-        elif (self.mode == "editor"):
+        elif self.mode == "editor":
             STATUS_QUERY = ("SELECT status, count(*) as num "
                             "FROM Manuscript "
                             "GROUP BY status "
@@ -234,7 +259,7 @@ class CmdInterface(cmd.Cmd):
             # for row in self.cursor:
             #     print("{}\t{}".format((row["status"].replace("_", " ")).title(), row["num"]))
 
-        elif (self.mode == "reviewer"):
+        elif self.mode == "reviewer":
             STATUS_QUERY = ("SELECT Manuscript.id, Manuscript.title FROM Manuscript, Person, Manuscript_Reviewer "
                             "WHERE Manuscript.id = Manuscript_Reviewer.manuscript_id "
                             "AND Person.id = {} "
@@ -257,7 +282,7 @@ class CmdInterface(cmd.Cmd):
             return
 
     def do_accept(self, line):
-        if (self.mode == "reviewer"):
+        if self.mode == "reviewer":
             manuscript_id, appropriate, clarity, method, contribution = shlex.split(line)
 
             try:
@@ -279,10 +304,10 @@ class CmdInterface(cmd.Cmd):
                             "SET `result`='{}', `clarity`='{}', `method`='{}', `contribution`='{}', `appropriate`='{}' "
                             "WHERE `reviewer_id`='{}' AND `manuscript_id`='{}' AND `result` = '-';").format('y', clarity, method, appropriate, contribution, self.curr_id, manuscript_id)
 
-            if (self.do_execute(UPDATE_QUERY)):
+            if self.do_execute(UPDATE_QUERY):
                 self.conn.commit()
 
-        elif (self.mode == "editor"):
+        elif self.mode == "editor":
             print("Command not usable")
             return
         else:
@@ -290,7 +315,7 @@ class CmdInterface(cmd.Cmd):
             return
 
     def do_reject(self, line):
-        if (self.mode == "reviewer"):
+        if self.mode == "reviewer":
             manuscript_id, appropriate, clarity, method, contribution = shlex.split(line)
 
             try:
@@ -312,10 +337,10 @@ class CmdInterface(cmd.Cmd):
                             "SET `result`='{}', `clarity`='{}', `method`='{}', `contribution`='{}', `appropriate`='{}' "
                             "WHERE `reviewer_id`='{}' AND `manuscript_id`='{}' AND `result` = '-';").format('n', clarity, method, appropriate, contribution, self.curr_id, manuscript_id)
 
-            if (self.do_execute(UPDATE_QUERY)):
+            if self.do_execute(UPDATE_QUERY):
                 self.conn.commit()
 
-        elif (self.mode == "editor"):
+        elif self.mode == "editor":
             print("Command not usable")
             return
         else:
@@ -323,15 +348,14 @@ class CmdInterface(cmd.Cmd):
             return
 
     def do_retract(self, line):
-        if (self.mode == "author"):
+        if self.mode == "author":
             manuscript_id = shlex.split(line)[0]
 
             try:
                 manuscript_id = int(manuscript_id)
-                if (manuscript_id < 0):
+                if manuscript_id < 0:
                     print("ID must be non-negative!")
                     return
-
             except ValueError:
                 print("Invalid Input, please retry")
                 return
@@ -348,9 +372,7 @@ class CmdInterface(cmd.Cmd):
                 for query in query_list:
                     if not self.do_execute(query):
                         return
-
                 self.con.commit()
-
                 print("Manuscript Retracted!")
 
         else:
