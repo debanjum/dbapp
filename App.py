@@ -120,8 +120,12 @@ class CmdInterface(cmd.Cmd):
             self.cursor.execute(QUERY)
         except mysql.connector.Error as e:        # catch SQL errors
             print("SQL Error: {0}".format(e.msg))
-        except:                                   # anything else
-            print("Unexpected error: {0}".format(sys.exc_info()[0]))
+            return
+
+        if self.cursor.rowcount > 0:
+            print("Operation Successful!");
+        else:
+            print("No Rows Affected by Operation, such a record does not exist or is inaccessible");
 
     def do_display(self, QUERY):
         """helper function to execute SQL statement and render results"""
@@ -140,8 +144,6 @@ class CmdInterface(cmd.Cmd):
 
         except mysql.connector.Error as e:        # catch SQL errors
             print("SQL Error: {0}".format(e.msg))
-        except:                                   # anything else
-            print("Unexpected error: {0}".format(sys.exc_info()[0]))
 
     def do_logout(self, line):
         self.mode = "none"
@@ -210,7 +212,7 @@ class CmdInterface(cmd.Cmd):
                             "WHERE Manuscript.id = Manuscript_Reviewer.manuscript_id "
                             "AND Person.id = {} "
                             "AND Person.id = Manuscript_Reviewer.reviewer_id "
-                            "AND Manuscript.status = 'under_review';").format(self.curr_id)
+                            "AND Manuscript.status = 'under_review' AND Manuscript_Reviewer.result = '-';").format(self.curr_id)
 
             self.do_display(STATUS_QUERY);
 
@@ -225,6 +227,72 @@ class CmdInterface(cmd.Cmd):
         else:
             print("Command not usable")
             return
+
+    def do_accept(self, line):
+        if (self.mode == "reviewer"):
+            manuscript_id, appropriate, clarity, method, contribution = shlex.split(line)
+
+            try: 
+                manuscript_id = int(manuscript_id)
+                appropriate = int(appropriate)
+                clarity = int(clarity)
+                method = int(method)
+                contribution = int(contribution)
+
+                if (appropriate < 0 or appropriate > 10) or (clarity < 0 or clarity > 10) or (method < 0 or method > 10) or (contribution < 0 or contribution > 10):
+                    print("Scores must be between 0 and 10")
+                    return
+
+            except ValueError:
+                print("Invalid Input, please retry")
+                return
+
+            UPDATE_QUERY = ("UPDATE `aalavi_db`.`Manuscript_Reviewer` SET `result`='{}', `clarity`='{}', `method`='{}', "
+                " `contribution`='{}', `appropriate`='{}' WHERE `reviewer_id`='{}' AND `manuscript_id`='{}' AND `result` = '-';").format('y', clarity, method, appropriate, contribution, self.curr_id, manuscript_id)
+
+            self.do_execute(UPDATE_QUERY)
+
+            self.conn.commit()
+
+        elif (self.mode == "editor"):
+            print("Command not usable")
+            return 
+        else:
+           print("Command not usable")
+           return 
+
+    def do_reject(self, line):
+        if (self.mode == "reviewer"):
+            manuscript_id, appropriate, clarity, method, contribution = shlex.split(line)
+
+            try: 
+                manuscript_id = int(manuscript_id)
+                appropriate = int(appropriate)
+                clarity = int(clarity)
+                method = int(method)
+                contribution = int(contribution)
+
+                if (appropriate < 0 or appropriate > 10) or (clarity < 0 or clarity > 10) or (method < 0 or method > 10) or (contribution < 0 or contribution > 10):
+                    print("Scores must be between 0 and 10")
+                    return
+
+            except ValueError:
+                print("Invalid Input, please retry")
+                return
+
+            UPDATE_QUERY = ("UPDATE `aalavi_db`.`Manuscript_Reviewer` SET `result`='{}', `clarity`='{}', `method`='{}', "
+                " `contribution`='{}', `appropriate`='{}' WHERE `reviewer_id`='{}' AND `manuscript_id`='{}' AND `result` = '-';").format('n', clarity, method, appropriate, contribution, self.curr_id, manuscript_id)
+
+            self.do_execute(UPDATE_QUERY)
+
+            self.con.commit()
+
+        elif (self.mode == "editor"):
+            print("Command not usable")
+            return 
+        else:
+           print("Command not usable")
+           return 
 
     def do_EOF(self, line):
         return True
@@ -260,7 +328,5 @@ if __name__ == "__main__":
 
     except mysql.connector.Error as e:        # catch SQL errors
         print("SQL Error: {0}".format(e.msg))
-    except:                                   # anything else
-        print("Unexpected error: {0}".format(sys.exc_info()[0]))
 
     print("\nConnection terminated.", end='')
