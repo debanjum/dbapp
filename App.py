@@ -307,11 +307,11 @@ class CmdInterface(cmd.Cmd):
                 return
 
             # update manuscript status
-            queries = [("UPDATE Manuscript SET status = \'{}\' "
-                        "WHERE id = {}").format("accepted", manuscript_id)]
+            query = ("UPDATE Manuscript SET status = \'{}\' "
+                     "WHERE id = {}").format("accepted", manuscript_id)
 
             # execute queries
-            if self.do_execute(queries, multi=True):
+            if self.do_execute(query):
                 self.con.commit()
         else:
             print("Command not usable")
@@ -347,14 +347,29 @@ class CmdInterface(cmd.Cmd):
                 return
 
             # update manuscript status
-            queries = [("UPDATE Manuscript SET status = \'{}\' "
-                        "WHERE id = {}").format("rejected", manuscript_id)]
+            query = ("UPDATE Manuscript SET status = \'{}\' "
+                     "WHERE id = {}").format("rejected", manuscript_id)
 
             # execute queries
-            if self.do_execute(queries, multi=True):
+            if self.do_execute(query):
                 self.con.commit()
         else:
             print("Command not usable")
+
+    def do_typeset(self, line):
+        # verify mode
+        if self.mode != "editor":
+            print ("Command not usable in this mode")
+
+        # parse arguments
+        manuscript_id, pp = map(int, shlex.split(line))
+
+        # execute queries
+        query = ("UPDATE Manuscript SET status = \'{}\', num_pages = {} "
+                 "WHERE id = {}").format("typesetting", pp, manuscript_id)
+
+        if self.do_execute(query):
+            self.con.commit()
 
     def do_retract(self, line):
         if self.mode == "author":
@@ -387,15 +402,14 @@ class CmdInterface(cmd.Cmd):
             print("Manuscript Retracted!")
 
         else:
-           print("Command not usable")
-           return
+            print("Command not usable")
 
     def do_resign(self, line):
         if self.mode == "reviewer":
-            UPDATE_QUERY = "UPDATE Person SET type = 4 WHERE id = {}".format(self.curr_id);
+            UPDATE_QUERY = "UPDATE Person SET type = 4 WHERE id = {}".format(self.curr_id)
 
             if self.do_execute(UPDATE_QUERY):
-                self.con.commit();
+                self.con.commit()
 
     def do_EOF(self, line):
         return True
