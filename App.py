@@ -279,19 +279,12 @@ class CmdInterface(cmd.Cmd):
 
         else:
             print("Command not usable")
-            return
 
     def do_accept(self, line):
         if self.mode == "reviewer":
-            manuscript_id, appropriate, clarity, method, contribution = shlex.split(line)
+            manuscript_id, appropriate, clarity, method, contribution = map(int, shlex.split(line))
 
             try:
-                manuscript_id = int(manuscript_id)
-                appropriate = int(appropriate)
-                clarity = int(clarity)
-                method = int(method)
-                contribution = int(contribution)
-
                 if not (0 <= appropriate <= 10) or not (0 <= clarity <= 10) or not (0 <= method <= 10) or not (0 <= contribution <= 10):
                     print("Scores must be between 0 and 10")
                     return
@@ -308,11 +301,24 @@ class CmdInterface(cmd.Cmd):
                 self.conn.commit()
 
         elif self.mode == "editor":
-            print("Command not usable")
-            return
+            manuscript_id = line
+
+            # verify if all reviewers submitted their results
+            not_reviewed_by_all = ("SELECT * FROM Manuscript_Reviewer "
+                                   "WHERE `manuscript_id`='{}' AND result = '-';").format(manuscript_id)
+            if self.do_execute(not_reviewed_by_all):
+                print("Can't accept manuscript until all manuscript reviewers submit their results")
+                return
+
+            # update manuscript status
+            queries = [("UPDATE Manuscript SET status = \'{}\' "
+                        "WHERE id = {}").format("accepted", manuscript_id)]
+
+            # execute queries
+            if self.do_execute(queries, multi=True):
+                self.con.commit()
         else:
             print("Command not usable")
-            return
 
     def do_reject(self, line):
         if self.mode == "reviewer":
@@ -341,6 +347,7 @@ class CmdInterface(cmd.Cmd):
                 self.conn.commit()
 
         elif self.mode == "editor":
+
             print("Command not usable")
             return
         else:
@@ -363,17 +370,19 @@ class CmdInterface(cmd.Cmd):
             CHECK_QUERY = ("SELECT * FROM Manuscript_Author WHERE "
                            "author_id = {} AND manuscript_id = {} AND rank = 1").format(self.curr_id, manuscript_id)
 
-            if self.do_execute(CHECK_QUERY):
-                query_list = list()
-                query_list.append("DELETE FROM Manuscript_Author WHERE manuscript_id = {};".format(manuscript_id))
-                query_list.append("DELETE FROM Manuscript_Reviewer WHERE manuscript_id = {};".format(manuscript_id))
-                query_list.append("DELETE FROM Manuscript WHERE id = {};".format(manuscript_id))
+            if not self.do_execute(CHECK_QUERY):
+                return
 
-                for query in query_list:
-                    if not self.do_execute(query):
-                        return
-                self.con.commit()
-                print("Manuscript Retracted!")
+            query_list = list()
+            query_list.append("DELETE FROM Manuscript_Author WHERE manuscript_id = {};".format(manuscript_id))
+            query_list.append("DELETE FROM Manuscript_Reviewer WHERE manuscript_id = {};".format(manuscript_id))
+            query_list.append("DELETE FROM Manuscript WHERE id = {};".format(manuscript_id))
+
+            for query in query_list:
+                if not self.do_execute(query):
+                    return
+            self.con.commit()
+            print("Manuscript Retracted!")
 
         else:
            print("Command not usable")
