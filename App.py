@@ -36,20 +36,28 @@ class CmdInterface(cmd.Cmd):
         # extract arguments
         args = shlex.split(line)
         title, affiliation, ri_code = args[:3]
-        additional_authors = args[3:-1]
+        authors = [self.curr_id]
+        authors.extend(args[3:-1])
         filename = args[-1]
 
-        print ("title: {}, affiliation: {}, ri_code: {}, additional_authors: {} \
-        filename: {}".format(title, affiliation, ri_code, additional_authors, filename))
-
         # create squery to insert manuscript into manuscript table
-        queries = [("INSERT INTO `Manuscript` (`title`,`description`,`ri_code`,`status`,`issue_vol`,`issue_year`,"
-                    "`num_pages`, `start_page`, `review_date`, `filename`) VALUES "
-                    "(\'{}\', '', {}, \'{}\', NULL, NULL, NULL, NULL, \'{}\', \'{}\', NULL, \'{}\');").format(title, ri_code, 'submitted', filename)]
+        queries = ("INSERT INTO `Manuscript` (`title`,`description`,`ri_code`,`status`,`issue_vol`,`issue_year`,"
+                   "`num_pages`, `start_page`, `review_date`, `filename`) VALUES "
+                   "(\'{}\', '', {}, \'{}\', NULL, NULL, NULL, NULL, NULL, \'{}\');").format(title, ri_code, 'submitted', filename)
+
+        if self.do_execute(queries):
+            self.con.commit()
+
+        # create queries to insert manuscript author and their ranks into manuscript_author table
+        manuscript_id, rank, queries = self.cursor.lastrowid, 1, list()
+        for author in authors:
+            queries += [("INSERT INTO `Manuscript_Author` (`manuscript_id`, `author_id`, `rank`) VALUES "
+                         "({}, {}, {});").format(manuscript_id, author, rank)]
+            rank += 1
 
         # create query to update current logged in users affiliation
-        queries += ["UPDATE `Person` "
-                    "SET affiliation = '{}' WHERE id = {}".format(affiliation, self.curr_id)]
+        queries += [("UPDATE `Person` "
+                     "SET affiliation = '{}' WHERE id = {}").format(affiliation, self.curr_id)]
 
         # execute queries
         if self.do_execute(queries, multi=True):
