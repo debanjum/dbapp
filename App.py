@@ -153,10 +153,6 @@ class CmdInterface(cmd.Cmd):
         if self.do_execute(queries, multi=True):
             self.con.commit()
 
-        # Render Updated Table
-        self.do_display("SELECT * FROM Person;")
-        self.do_display("SELECT * FROM Reviewer_Interest;")
-
     def do_execute(self, query, multi=False):
         """helper function to execute SQL statement"""
         try:
@@ -322,15 +318,9 @@ class CmdInterface(cmd.Cmd):
 
     def do_reject(self, line):
         if self.mode == "reviewer":
-            manuscript_id, appropriate, clarity, method, contribution = shlex.split(line)
+            manuscript_id, appropriate, clarity, method, contribution = map(int, shlex.split(line))
 
             try:
-                manuscript_id = int(manuscript_id)
-                appropriate = int(appropriate)
-                clarity = int(clarity)
-                method = int(method)
-                contribution = int(contribution)
-
                 if (appropriate < 0 or appropriate > 10) or (clarity < 0 or clarity > 10) or (method < 0 or method > 10) or (contribution < 0 or contribution > 10):
                     print("Scores must be between 0 and 10")
                     return
@@ -347,12 +337,24 @@ class CmdInterface(cmd.Cmd):
                 self.conn.commit()
 
         elif self.mode == "editor":
+            manuscript_id = line
 
-            print("Command not usable")
-            return
+            # verify if all reviewers submitted their results
+            not_reviewed_by_all = ("SELECT * FROM Manuscript_Reviewer "
+                                   "WHERE `manuscript_id`='{}' AND result = '-';").format(manuscript_id)
+            if self.do_execute(not_reviewed_by_all):
+                print("Can't accept manuscript until all manuscript reviewers submit their results")
+                return
+
+            # update manuscript status
+            queries = [("UPDATE Manuscript SET status = \'{}\' "
+                        "WHERE id = {}").format("rejected", manuscript_id)]
+
+            # execute queries
+            if self.do_execute(queries, multi=True):
+                self.con.commit()
         else:
             print("Command not usable")
-            return
 
     def do_retract(self, line):
         if self.mode == "author":
@@ -389,10 +391,10 @@ class CmdInterface(cmd.Cmd):
            return
 
     def do_resign(self, line):
-        if (self.mode == "reviewer"):
+        if self.mode == "reviewer":
             UPDATE_QUERY = "UPDATE Person SET type = 4 WHERE id = {}".format(self.curr_id);
 
-            if (self.do_execute(UPDATE_QUERY)):
+            if self.do_execute(UPDATE_QUERY):
                 self.con.commit();
 
     def do_EOF(self, line):
