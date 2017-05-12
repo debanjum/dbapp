@@ -44,8 +44,8 @@ class CmdInterface(cmd.Cmd):
 
         # create squery to insert manuscript into manuscript table
         queries = [("INSERT INTO `Manuscript` (`title`,`description`,`ri_code`,`status`,`issue_vol`,`issue_year`,"
-                    "`num_pages`, `start_page`, `review_date`) VALUES "
-                    "(\'{}\', '', {}, \'{}\', NULL, NULL, NULL, NULL, \'{}\', \'{}\', NULL);").format(title, ri_code, 'submitted')]
+                    "`num_pages`, `start_page`, `review_date`, `filename`) VALUES "
+                    "(\'{}\', '', {}, \'{}\', NULL, NULL, NULL, NULL, \'{}\', \'{}\', NULL, \'{}\');").format(title, ri_code, 'submitted', filename)]
 
         # create query to update current logged in users affiliation
         queries += ["UPDATE `Person` "
@@ -376,8 +376,15 @@ class CmdInterface(cmd.Cmd):
                 print("Manuscript Retracted!")
 
         else:
-            print("Command not usable")
-            return
+           print("Command not usable")
+           return
+
+    def do_resign(self, line):
+        if (self.mode == "reviewer"):
+            UPDATE_QUERY = "UPDATE Person SET type = 4 WHERE id = {}".format(self.curr_id);
+
+            if (self.do_execute(UPDATE_QUERY)):
+                self.con.commit();
 
     def do_EOF(self, line):
         return True
