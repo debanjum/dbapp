@@ -38,15 +38,14 @@ class CmdInterface(cmd.Cmd):
         title, affiliation, ri_code = args[:3]
         additional_authors = args[3:-1]
         filename = args[-1]
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         print ("title: {}, affiliation: {}, ri_code: {}, additional_authors: {} \
-        filename: {}, now: {}".format(title, affiliation, ri_code, additional_authors, filename, now))
+        filename: {}".format(title, affiliation, ri_code, additional_authors, filename))
 
         # create squery to insert manuscript into manuscript table
         queries = [("INSERT INTO `Manuscript` (`title`,`description`,`ri_code`,`status`,`issue_vol`,`issue_year`,"
-                    "`num_pages`, `start_page`, `date_changed`, `date_created`, `review_date`) VALUES "
-                    "(\'{}\', '', {}, \'{}\', NULL, NULL, NULL, NULL, \'{}\', \'{}\', NULL);").format(title, ri_code, 'submitted', now, now)]
+                    "`num_pages`, `start_page`, `review_date`) VALUES "
+                    "(\'{}\', '', {}, \'{}\', NULL, NULL, NULL, NULL, \'{}\', \'{}\', NULL);").format(title, ri_code, 'submitted')]
 
         # create query to update current logged in users affiliation
         queries += ["UPDATE `Person` "
@@ -68,7 +67,8 @@ class CmdInterface(cmd.Cmd):
         queries = [("INSERT INTO `Manuscript_Reviewer` "
                     "(`reviewer_id`, `manuscript_id`, `result`, `clarity`, `method`, `contribution`, `appropriate`) "
                     "VALUES ({},{},'-',NULL,NULL,NULL,NULL);").format(rev_id, man_id)]
-        queries += [("UPDATE Manuscript SET review_date = \'{}\' WHERE id = {}").format(now, man_id)]
+        queries += [("UPDATE Manuscript SET status = \'{}\', review_date = \'{}\'"
+                     "WHERE id = {}").format("under review", now, man_id)]
 
         # execute queries
         if self.do_execute(queries, multi=True):
