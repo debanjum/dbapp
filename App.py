@@ -7,10 +7,8 @@ import shlex                            # for parsing shell type arguments
 import datetime
 import random
 
-EDITOR = 1
-AUTHOR = 2
-REVIEWER = 3
-RETIRED_REVIEWER = 4
+# Person Type
+EDITOR, AUTHOR, REVIEWER, RETIRED_REVIEWER = 1, 2, 3, 4
 
 # Configure SQL Driver
 PASS = "" if len(sys.argv) < 1 else sys.argv[1]    # user's password
@@ -41,14 +39,11 @@ class CmdInterface(cmd.Cmd):
         authors.extend(args[3:-1])
         filename = args[-1]
 
-        print ("title: {}, affiliation: {}, ri_code: {}, additional_authors: {} \
-        filename: {}".format(title, affiliation, ri_code, authors, filename))
-
         EDITOR_QUERY = "SELECT id FROM Person WHERE type = 1;"
 
-        chosen_editor = -1;
+        chosen_editor = -1
 
-        if (self.do_execute(EDITOR_QUERY)):
+        if self.do_execute(EDITOR_QUERY):
             editor_ids = list()
 
             for row in self.cursor:
@@ -65,10 +60,10 @@ class CmdInterface(cmd.Cmd):
 
         # create squery to insert manuscript into manuscript table
         INSERT_QUERY = ("INSERT INTO `Manuscript` (`title`,`description`,`ri_code`,`status`,`issue_vol`,`issue_year`,"
-                    "`num_pages`, `start_page`, `review_date`, `filename`, `assigned_editor`) VALUES "
-                    "(\'{}\', '', {}, \'{}\', NULL, NULL, NULL, NULL, NULL, \'{}\', {});").format(title, ri_code, 'Submitted', filename, chosen_editor)
+                        "`num_pages`, `start_page`, `review_date`, `filename`, `assigned_editor`) VALUES "
+                        "(\'{}\', '', {}, \'{}\', NULL, NULL, NULL, NULL, NULL, \'{}\', {});").format(title, ri_code, 'Submitted', filename, chosen_editor)
 
-        if (self.do_execute(INSERT_QUERY) == False):
+        if not self.do_execute(INSERT_QUERY):
             self.con.rollback()
             return
         else:
@@ -77,18 +72,19 @@ class CmdInterface(cmd.Cmd):
         # create query to update current logged in users affiliation
         queries = list()
         UPDATE_QUERY = (("UPDATE `Person` "
-                    "SET affiliation = '{}' WHERE id = {};").format(affiliation, self.curr_id))
+                         "SET affiliation = '{}' WHERE id = {};").format(affiliation, self.curr_id))
 
-        self.do_execute(UPDATE_QUERY);
+        self.do_execute(UPDATE_QUERY)
 
-        rank = 1;
+        rank = 1
         for author in authors:
-            queries.append("SELECT * FROM Person WHERE id = {} AND type = {}".format(author, AUTHOR));
-            queries.append("INSERT INTO `Manuscript_Author` (`manuscript_id`, `author_id`, `rank`) VALUES ('{}', '{}', '{}');".format(new_manuscript_id, author, rank))
+            queries.append("SELECT * FROM Person WHERE id = {} AND type = {};".format(author, AUTHOR))
+            queries.append(("INSERT INTO `Manuscript_Author` (`manuscript_id`, `author_id`, `rank`) "
+                            "VALUES ('{}', '{}', '{}');").format(new_manuscript_id, author, rank))
             rank = rank + 1
 
         for query in queries:
-            if self.do_execute(query) == False:
+            if not self.do_execute(query):
                 self.con.rollback()
                 return
 
@@ -105,22 +101,23 @@ class CmdInterface(cmd.Cmd):
 
         rev_validation_query = "SELECT * FROM Person WHERE id = {} AND type = {};".format(rev_id, REVIEWER)
 
-        if (self.do_execute(rev_validation_query) == False):
+        if not self.do_execute(rev_validation_query):
             return
 
-        ri_code_validation_query = "SELECT ri_code FROM Reviewer_Interest WHERE reviewer_id = {};".format(rev_id);
+        ri_code_validation_query = "SELECT ri_code FROM Reviewer_Interest WHERE reviewer_id = {};".format(rev_id)
 
-        if (self.do_execute(ri_code_validation_query) == False):
+        if not self.do_execute(ri_code_validation_query):
             return
 
-        interest_ri_codes = list();
+        interest_ri_codes = list()
 
         for row in self.cursor:
             interest_ri_codes.append(row['ri_code'])
 
-        man_ri_code_query = "SELECT ri_code FROM Manuscript WHERE id = {} AND assigned_editor = {}".format(man_id, self.curr_id)
+        man_ri_code_query = ("SELECT ri_code FROM Manuscript "
+                             "WHERE id = {} AND assigned_editor = {};").format(man_id, self.curr_id)
 
-        if (self.do_execute(man_ri_code_query) == False):
+        if not self.do_execute(man_ri_code_query):
             return
 
         man_ri_code = -1
@@ -130,7 +127,7 @@ class CmdInterface(cmd.Cmd):
 
         assert man_ri_code > -1
 
-        if (man_ri_code not in interest_ri_codes):
+        if man_ri_code not in interest_ri_codes:
             print("This Paper does not match this Reviewer's Interests, cannot assign!")
             return
 
@@ -139,11 +136,11 @@ class CmdInterface(cmd.Cmd):
                     "(`reviewer_id`, `manuscript_id`, `result`, `clarity`, `method`, `contribution`, `appropriate`) "
                     "VALUES ({},{},'-',NULL,NULL,NULL,NULL);").format(rev_id, man_id)]
         queries += [("UPDATE Manuscript SET status = \'{}\', review_date = \'{}\'"
-                     "WHERE id = {}").format("Under Review", now, man_id)]
+                     "WHERE id = {};").format("Under Review", now, man_id)]
 
         # execute queries
         for query in queries:
-            if self.do_execute(query) == False:
+            if not self.do_execute(query):
                 self.con.rollback()
                 return
 
@@ -174,7 +171,6 @@ class CmdInterface(cmd.Cmd):
                                 "ORDER BY status, num;").format(self.curr_id)
 
                 self.do_display(STATUS_QUERY)
-
                 print("")
 
             elif row["type"] == AUTHOR:
@@ -237,7 +233,7 @@ class CmdInterface(cmd.Cmd):
 
         # Execute Query
         for query in queries:
-            if self.do_execute(query) == False:
+            if not self.do_execute(query):
                 self.con.rollback()
                 return
 
@@ -330,7 +326,7 @@ class CmdInterface(cmd.Cmd):
             #     print("{}\t{}\t{}".format(row["id"], ("{}...").format(row["title"][:20]), row["status"]))
 
         elif self.mode == "editor":
-            if (len(shlex.split(line)) == 0):
+            if len(shlex.split(line)) == 0:
                 STATUS_QUERY = ("SELECT id, title, status, ri_code as num "
                                 "FROM Manuscript "
                                 "WHERE assigned_editor = {} "
@@ -338,11 +334,10 @@ class CmdInterface(cmd.Cmd):
 
                 self.do_display(STATUS_QUERY)
             else:
-                if (shlex.split(line)[0] == 'issue'):
-                    STATUS_QUERY = ("SELECT * FROM Issue")
+                if shlex.split(line)[0] == 'issue':
+                    STATUS_QUERY = ("SELECT * FROM Issue;")
 
                     self.do_display(STATUS_QUERY)
-
 
             # print("\nStatus of Manuscripts in System:")
             # print("".join(["{:<12}".format(col) for col in self.cursor.column_names]))
@@ -395,10 +390,10 @@ class CmdInterface(cmd.Cmd):
 
         elif self.mode == "editor":
             manuscript_id = line
+            permissions_check = ("SELECT * FROM Manuscript "
+                                 "WHERE id = {} AND assigned_editor = {};").format(manuscript_id, self.curr_id)
 
-            permissions_check = "SELECT * FROM Manuscript WHERE id = {} AND assigned_editor = {};".format(manuscript_id, self.curr_id)
-
-            if (self.do_execute(permissions_check) == False):
+            if not self.do_execute(permissions_check):
                 return
 
             # verify if all reviewers submitted their results
@@ -410,7 +405,7 @@ class CmdInterface(cmd.Cmd):
 
             # update manuscript status
             query = ("UPDATE Manuscript SET status = \'{}\' "
-                     "WHERE id = {}").format("Accepted", manuscript_id)
+                     "WHERE id = {};").format("Accepted", manuscript_id)
 
             # execute queries
             if self.do_execute(query):
@@ -443,9 +438,10 @@ class CmdInterface(cmd.Cmd):
         elif self.mode == "editor":
             manuscript_id = line
 
-            permissions_check = "SELECT * FROM Manuscript WHERE id = {} AND assigned_editor = {};".format(manuscript_id, self.curr_id)
+            permissions_check = ("SELECT * FROM Manuscript "
+                                 "WHERE id = {} AND assigned_editor = {};").format(manuscript_id, self.curr_id)
 
-            if (self.do_execute(permissions_check) == False):
+            if not self.do_execute(permissions_check):
                 return
 
             # verify if all reviewers submitted their results
@@ -457,7 +453,7 @@ class CmdInterface(cmd.Cmd):
 
             # update manuscript status
             query = ("UPDATE Manuscript SET status = \'{}\' "
-                     "WHERE id = {}").format("Rejected", manuscript_id)
+                     "WHERE id = {};").format("Rejected", manuscript_id)
 
             # execute queries
             if self.do_execute(query):
@@ -486,9 +482,10 @@ class CmdInterface(cmd.Cmd):
 
         manuscript_id, issue_vol, issue_year = shlex.split(line)
 
-        NUM_PAGES_QUERY = "SELECT num_pages FROM Manuscript WHERE id = {} AND assigned_editor = {} AND status = \'Typesetting\'".format(manuscript_id, self.curr_id);
+        NUM_PAGES_QUERY = ("SELECT num_pages FROM Manuscript "
+                           "WHERE id = {} AND assigned_editor = {} AND status = \'Typesetting\';").format(manuscript_id, self.curr_id)
 
-        if (self.do_execute(NUM_PAGES_QUERY) == False):
+        if not self.do_execute(NUM_PAGES_QUERY):
             return
 
         num_pages = -1
@@ -499,23 +496,25 @@ class CmdInterface(cmd.Cmd):
         assert num_pages > 0
 
         SUM_PAGES_QUERY = ("SELECT SUM(num_pages) as sum_pages "
-        "FROM Manuscript "
-        "WHERE status = 'Scheduled' AND issue_vol = {} AND issue_year = {};").format(issue_vol, issue_year)
+                           "FROM Manuscript "
+                           "WHERE status = 'Scheduled' AND issue_vol = {} AND issue_year = {};").format(issue_vol, issue_year)
 
         sum_pages = 0
 
-        if (self.do_execute(SUM_PAGES_QUERY) == True):
+        if self.do_execute(SUM_PAGES_QUERY):
             for row in self.cursor:
                 if row['sum_pages'] is not None:
                     sum_pages = row['sum_pages']
 
-        if (sum_pages + num_pages > 100):
+        if sum_pages + num_pages > 100:
             print("Issue has exceeded a 100 pages, cannot schedule")
             return
 
-        UPDATE_QUERY = "UPDATE Manuscript SET issue_vol = {}, issue_year = {}, start_page = {}, status = \'Scheduled\' WHERE id = {}".format(issue_vol, issue_year, sum_pages + 1, manuscript_id)
+        UPDATE_QUERY = ("UPDATE Manuscript "
+                        "SET issue_vol = {}, issue_year = {}, start_page = {}, status = \'Scheduled\' "
+                        "WHERE id = {};").format(issue_vol, issue_year, sum_pages + 1, manuscript_id)
 
-        if (self.do_execute(UPDATE_QUERY)):
+        if self.do_execute(UPDATE_QUERY):
             self.con.commit()
 
     def do_publish(self, line):
@@ -525,12 +524,14 @@ class CmdInterface(cmd.Cmd):
 
         issue_vol, issue_year = shlex.split(line)
 
-        UPDATE_ISSUE = "UPDATE Issue SET status = \'Published\' WHERE year = {} and volume = {} AND status = \'Scheduled\';".format(issue_year, issue_vol)
+        UPDATE_ISSUE = ("UPDATE Issue SET status = \'Published\' "
+                        "WHERE year = {} and volume = {} AND status = \'Scheduled\';").format(issue_year, issue_vol)
 
-        if (self.do_execute(UPDATE_ISSUE)):
-            UPDATE_MANUSCRIPTS = "UPDATE Manuscript SET status = \'Published\' WHERE issue_year = {} and issue_vol = {} AND status = \'Scheduled\' ;".format(issue_year, issue_vol)
+        if self.do_execute(UPDATE_ISSUE):
+            UPDATE_MANUSCRIPTS = ("UPDATE Manuscript SET status = \'Published\' "
+                                  "WHERE issue_year = {} and issue_vol = {} AND status = \'Scheduled\';").format(issue_year, issue_vol)
 
-            if (self.do_execute(UPDATE_MANUSCRIPTS)):
+            if self.do_execute(UPDATE_MANUSCRIPTS):
                 self.con.commit()
 
     def do_createissue(self, line):
@@ -541,14 +542,15 @@ class CmdInterface(cmd.Cmd):
 
         issue_period = int(issue_period)
 
-        if (issue_period > 4 or issue_period < 0):
+        if issue_period > 4 or issue_period < 0:
             print("Invalid Period")
             return
 
-        CREATE_QUERY = "INSERT INTO `aalavi_db`.`Issue` (`year`, `period`, `volume`, `title`) VALUES ('{}', '{}', '{}', '{}');".format(issue_year, issue_period, issue_vol, issue_title);
+        CREATE_QUERY = ("INSERT INTO `aalavi_db`.`Issue` (`year`, `period`, `volume`, `title`) "
+                        "VALUES ('{}', '{}', '{}', '{}');").format(issue_year, issue_period, issue_vol, issue_title)
 
-        if (self.do_execute(CREATE_QUERY)):
-            self.con.commit();
+        if self.do_execute(CREATE_QUERY):
+            self.con.commit()
 
     def do_retract(self, line):
         if self.mode == "author":
@@ -564,7 +566,7 @@ class CmdInterface(cmd.Cmd):
                 return
 
             CHECK_QUERY = ("SELECT * FROM Manuscript_Author WHERE "
-                           "author_id = {} AND manuscript_id = {} AND rank = 1").format(self.curr_id, manuscript_id)
+                           "author_id = {} AND manuscript_id = {} AND rank = 1;").format(self.curr_id, manuscript_id)
 
             if not self.do_execute(CHECK_QUERY):
                 return
@@ -575,7 +577,7 @@ class CmdInterface(cmd.Cmd):
             query_list.append("DELETE FROM Manuscript WHERE id = {};".format(manuscript_id))
 
             for query in query_list:
-                self.do_execute(query);
+                self.do_execute(query)
 
             self.con.commit()
 
@@ -588,8 +590,8 @@ class CmdInterface(cmd.Cmd):
         if self.mode == "reviewer":
             answer = raw_input("Do you really want to resign? (y or n): ")
 
-            if (answer == "y"):
-                UPDATE_QUERY = "UPDATE Person SET type = 4 WHERE id = {}".format(self.curr_id)
+            if answer == "y":
+                UPDATE_QUERY = "UPDATE Person SET type = 4 WHERE id = {};".format(self.curr_id)
 
                 if self.do_execute(UPDATE_QUERY):
                     self.con.commit()
