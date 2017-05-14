@@ -99,9 +99,17 @@ class CmdInterface(cmd.Cmd):
         # extract arguments
         man_id, rev_id = shlex.split(line)
 
-        rev_validation_query = "SELECT * FROM Person WHERE id = {} AND type = {};".format(rev_id, REVIEWER)
+        # verify manuscript belongs to logged in editor
+        permissions_check = ("SELECT * FROM Manuscript "
+                             "WHERE id = {} AND assigned_editor = {};").format(man_id, self.curr_id)
+        if not self.do_execute(permissions_check):
+            print("Invalid Input: Only manuscripts belonging to current editor can be assigned")
+            return
 
+        # verify assigning to reviewer
+        rev_validation_query = "SELECT * FROM Person WHERE id = {} AND type = {};".format(rev_id, REVIEWER)
         if not self.do_execute(rev_validation_query):
+            print("Invalid Input: Manuscript can only be assigned to reviewers")
             return
 
         # find interests of reviewer being assigned
@@ -127,7 +135,7 @@ class CmdInterface(cmd.Cmd):
 
         # ensure reviewer and manuscript interests align
         if man_ri_code not in interest_ri_codes:
-            print("This paper does not match this Reviewer's Interests, cannot assign!")
+            print("Invalid Assignment: This paper does not match Reviewer {}'s Interests!".format(rev_id))
             return
 
         # insert manuscript_reviewer and update manuscript status
@@ -389,10 +397,12 @@ class CmdInterface(cmd.Cmd):
 
         elif self.mode == "editor":
             manuscript_id = line
+            # verify manuscript belongs to logged in editor
             permissions_check = ("SELECT * FROM Manuscript "
                                  "WHERE id = {} AND assigned_editor = {};").format(manuscript_id, self.curr_id)
 
             if not self.do_execute(permissions_check):
+                print("Invalid Input: Only manuscripts belonging to current editor can be accepted")
                 return
 
             # verify if all reviewers submitted their results
@@ -435,11 +445,12 @@ class CmdInterface(cmd.Cmd):
 
         elif self.mode == "editor":
             manuscript_id = line
-
+            # verify manuscript belongs to logged in editor
             permissions_check = ("SELECT * FROM Manuscript "
                                  "WHERE id = {} AND assigned_editor = {};").format(manuscript_id, self.curr_id)
 
             if not self.do_execute(permissions_check):
+                print("Invalid Input: Only manuscripts belonging to current editor can be rejected")
                 return
 
             # verify if all reviewers submitted their results
@@ -467,6 +478,14 @@ class CmdInterface(cmd.Cmd):
         # parse arguments
         manuscript_id, pp = map(int, shlex.split(line))
 
+        # verify manuscript belongs to logged in editor
+        permissions_check = ("SELECT * FROM Manuscript "
+                             "WHERE id = {} AND assigned_editor = {};").format(manuscript_id, self.curr_id)
+
+        if not self.do_execute(permissions_check):
+            print("Invalid Input: Only manuscripts belonging to current editor can be typeset")
+            return
+
         # execute query
         query = ("UPDATE Manuscript SET status = \'{}\', num_pages = {} "
                  "WHERE id = {} and status = \'Accepted\' AND assigned_editor = {};").format("Typesetting", pp, manuscript_id, self.curr_id)
@@ -479,6 +498,14 @@ class CmdInterface(cmd.Cmd):
             print ("Command not usable in this mode")
 
         manuscript_id, issue_vol, issue_year = shlex.split(line)
+
+        # verify manuscript belongs to logged in editor
+        permissions_check = ("SELECT * FROM Manuscript "
+                             "WHERE id = {} AND assigned_editor = {};").format(manuscript_id, self.curr_id)
+
+        if not self.do_execute(permissions_check):
+            print("Invalid Input: Only manuscripts belonging to current editor can be scheduled")
+            return
 
         # find number of pages in manuscript
         NUM_PAGES_QUERY = ("SELECT num_pages FROM Manuscript "
