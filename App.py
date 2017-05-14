@@ -75,6 +75,7 @@ class CmdInterface(cmd.Cmd):
 
         self.do_execute(UPDATE_QUERY)
 
+        # ensure authors exist in persons table, insert all listed authors into manuscript_author table with their rank
         rank = 1
         for author in authors:
             queries.append("SELECT * FROM Person WHERE id = {} AND type = {};".format(author, AUTHOR))
@@ -379,8 +380,8 @@ class CmdInterface(cmd.Cmd):
 
     def do_accept(self, line):
         if self.mode == "reviewer":
+            manuscript_id, appropriate, clarity, method, contribution = map(int, shlex.split(line))
             try:
-                manuscript_id, appropriate, clarity, method, contribution = map(int, shlex.split(line))
                 if not (0 <= appropriate <= 10) or not (0 <= clarity <= 10) or not (0 <= method <= 10) or not (0 <= contribution <= 10):
                     print("Invalid Input: Scores must be between 0 and 10")
                     return
@@ -426,8 +427,8 @@ class CmdInterface(cmd.Cmd):
 
     def do_reject(self, line):
         if self.mode == "reviewer":
+            manuscript_id, appropriate, clarity, method, contribution = map(int, shlex.split(line))
             try:
-                manuscript_id, appropriate, clarity, method, contribution = map(int, shlex.split(line))
                 if (appropriate < 0 or appropriate > 10) or (clarity < 0 or clarity > 10) or (method < 0 or method > 10) or (contribution < 0 or contribution > 10):
                     print("Scores must be between 0 and 10")
                     return
@@ -591,6 +592,7 @@ class CmdInterface(cmd.Cmd):
             print("Invalid Input: Please enter valid manuscript id")
             return
 
+        # only the primary author of the manuscript can retract it
         CHECK_QUERY = ("SELECT * FROM Manuscript_Author WHERE "
                        "author_id = {} AND manuscript_id = {} AND rank = 1;").format(self.curr_id, manuscript_id)
 
