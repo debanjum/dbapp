@@ -10,11 +10,11 @@ Commands
      display's custom info based on type of user (author, reviewer, editor) logging in
 
 - Mode: Editor
-  1. `status [issue#]`
+  1. `status [issue]`
 
      show manuscripts assigned to logged in editor
-     if (optional argument) issue# passed
-     show manuscripts in issue#
+     if (optional argument) 'issue' (i.e status issue) passed
+     show all the issues with their ids
 
   2. `assign <manu#> <reviewer_id>`
 
@@ -86,8 +86,14 @@ Commands
      if (optional argument) issue# passed
      show manuscripts in issue#
 
-  2. `accept <manuscript_id>`
-  3. `reject <manuscript_id>`
+  2. `accept <manuscript_id> <appropriateness> <clarity> <method> <contribution>`
+
+      recommends the manuscript for the journal with the entered scores
+
+  3. `reject <manuscript_id> <appropriateness> <clarity> <method> <contribution>`
+
+      recommends the manuscript for rejection with the entered scores
+
   4. `resign`
   5. `logout`
      log out of current user's account
